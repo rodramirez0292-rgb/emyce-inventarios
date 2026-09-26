@@ -94,6 +94,7 @@ export const normalizeSerial = (value: string) =>
 export const roundFor = (s: Inventory) => (s.status === "recount" ? 2 : 1);
 export function parseEquipmentBarcode(code: string) {
   const parts = code.trim().split(";");
+  if (parts.length === 3 && !parts[2].trim()) parts.pop();
   if (parts.length !== 2 || !parts.every((part) => part.trim())) return null;
   return { productCode: parts[0].trim(), serial: parts[1].trim() };
 }
