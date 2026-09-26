@@ -273,6 +273,51 @@ export function BarcodeScanner({
     </div>
   );
 }
+function PhotoCamera({ onCapture, onClose }: {
+  onCapture: (photo: string) => void;
+  onClose: () => void;
+}) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let disposed = false;
+    let stream: MediaStream | undefined;
+    void (async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia)
+          throw new Error("La cámara necesita HTTPS y un navegador compatible.");
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 960 } },
+          audio: false,
+        });
+        if (disposed) { stream.getTracks().forEach((track) => track.stop()); return; }
+        video.current!.srcObject = stream;
+        await video.current!.play();
+        if (!disposed) setReady(true);
+      } catch {
+        stream?.getTracks().forEach((track) => track.stop());
+        if (!disposed) setError("No se pudo abrir la cámara. Revisa su permiso o selecciona una foto guardada.");
+      }
+    })();
+    return () => { disposed = true; stream?.getTracks().forEach((track) => track.stop()); };
+  }, []);
+  return <div className="photo-camera">
+    <video ref={video} autoPlay muted playsInline aria-label="Vista previa de la fotografía" style={{ width: "100%", maxHeight: "45vh", objectFit: "contain", background: "#101820" }} />
+    {error && <p role="alert">{error}</p>}
+    <button type="button" className="btn primary" disabled={!ready} onClick={() => {
+      const source = video.current!;
+      if (!source.videoWidth || !source.videoHeight) return;
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(1, 1400 / Math.max(source.videoWidth, source.videoHeight));
+      canvas.width = Math.round(source.videoWidth * scale);
+      canvas.height = Math.round(source.videoHeight * scale);
+      canvas.getContext("2d")!.drawImage(source, 0, 0, canvas.width, canvas.height);
+      onCapture(canvas.toDataURL("image/jpeg", 0.78));
+    }}>Capturar fotografía</button>
+    <button type="button" className="btn secondary" onClick={onClose}>Cancelar cámara</button>
+  </div>;
+}
 export function CameraCapture({
   value,
   onChange,
@@ -283,6 +328,7 @@ export function CameraCapture({
   label?: string;
 }) {
   const [busy, setBusy] = useState(false);
+  const [camera, setCamera] = useState(false);
   const capture = async (file: File) => {
     setBusy(true);
     try {
@@ -319,16 +365,25 @@ export function CameraCapture({
   return (
     <div className="capture">
       {value && <img src={value} alt="Fotografía adjunta" />}
+      {camera ? <PhotoCamera onClose={() => setCamera(false)} onCapture={(photo) => {
+        onChange(photo);
+        setCamera(false);
+      }} /> : <button type="button" className="btn secondary" disabled={busy} onClick={() => setCamera(true)}>
+        <Camera size={18} />{value ? "Volver a tomar fotografía" : label}
+      </button>}
       <label className="btn secondary">
         <Camera size={18} />
-        {busy ? "Preparando foto…" : value ? "Cambiar fotografía" : label}
+        {busy ? "Preparando foto…" : "Seleccionar foto guardada"}
         <input
           type="file"
           accept="image/*"
-          capture="environment"
           disabled={busy}
           onChange={(e) => {
-            if (e.target.files?.[0]) void capture(e.target.files[0]);
+            if (e.target.files?.[0]) {
+              setCamera(false);
+              void capture(e.target.files[0]);
+              e.target.value = "";
+            }
           }}
         />
       </label>

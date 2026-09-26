@@ -27,6 +27,7 @@ import {
   LockKeyhole,
 } from "lucide-react";
 import { toast } from "sonner";
+import { readSerialDraft, saveSerialDraft } from "@/lib/serial-draft";
 import { useStore } from "./store";
 import {
   Action,
@@ -443,19 +444,31 @@ export function ScanPage() {
 }
 export function CountProduct() {
   const { id, productId } = useParams();
+  const { user, data, repo } = useStore();
+  const session = data.inventory_sessions.find((v) => v.id === id);
+  const draftKey = `emyce:serial-draft:${repo?.demo ? "demo" : "live"}:${user?.id}:${id}:${productId}:${session ? roundFor(session) : 1}`;
+  return <CountProductForm key={draftKey} draftKey={draftKey} />;
+}
+function CountProductForm({ draftKey }: { draftKey: string }) {
+  const { id, productId } = useParams();
   const { data, user, write } = useStore();
   const nav = useNavigate();
   const s = data.inventory_sessions.find((v) => v.id === id),
     p = data.products.find((v) => v.id === productId);
+  const [draft] = useState(() => readSerialDraft(draftKey));
   const [quantity, setQuantity] = useState("0"),
     [scan, setScan] = useState(false),
-    [candidate, setCandidate] = useState<string | null>(null),
-    [originalCode, setOriginalCode] = useState(""),
-    [photo, setPhoto] = useState(""),
-    [notes, setNotes] = useState(""),
-    [condition, setCondition] = useState("found"),
+    [candidate, setCandidate] = useState<string | null>(draft.candidate ?? null),
+    [originalCode, setOriginalCode] = useState(draft.originalCode ?? ""),
+    [photo, setPhoto] = useState(draft.photo ?? ""),
+    [notes, setNotes] = useState(draft.notes ?? ""),
+    [condition, setCondition] = useState(draft.condition ?? "found"),
     [duplicate, setDuplicate] = useState(""),
     [finish, setFinish] = useState(false);
+  useEffect(() => {
+    if (!saveSerialDraft(draftKey, { candidate, originalCode, photo, notes, condition }))
+      toast.error("No hay espacio para recuperar el borrador si se recarga la página. Guarda la serie antes de salir.");
+  }, [draftKey, candidate, originalCode, photo, notes, condition]);
   useEffect(() => {
     if (s && p)
       setQuantity(String(quantityFor(data, s.id, p, roundFor(s)) ?? 0));

@@ -1,4 +1,4 @@
-const CACHE = "emyce-shell-v2";
+const CACHE = "emyce-shell-v3";
 self.addEventListener("install", (e) => {
   e.waitUntil(
     caches
