@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeSerial,
   lookupBarcode,
+  parseEquipmentBarcode,
   searchProducts,
   operation,
   findDuplicate,
@@ -30,6 +31,16 @@ function fixture() {
   return { d, sid };
 }
 describe("Normalización y búsqueda", () => {
+  it("separa SKU y serie sin perder ceros ni alterar códigos simples", () => {
+    expect(parseEquipmentBarcode(" CCCHC110003;11100112505270073 \r\n")).toEqual({
+      productCode: "CCCHC110003", serial: "11100112505270073",
+    });
+    expect(parseEquipmentBarcode("SKU;00123")?.serial).toBe("00123");
+    for (const code of ["00123", "SKU;", ";SERIE", "SKU;SERIE;OTRO"])
+      expect(parseEquipmentBarcode(code)).toBeNull();
+    const product = { ...demoData().products[0], sku: "CCCHC110003" };
+    expect(lookupBarcode([product], parseEquipmentBarcode("CCCHC110003;11100112505270073")!.productCode)).toBe(product);
+  });
   it.each([
     [" abc- 123 ", "ABC123"],
     ["a\u200Bb\uFEFFc", "ABC"],

@@ -92,6 +92,11 @@ export const normalizeSerial = (value: string) =>
     .toUpperCase()
     .replace(/[\s\p{Cf}\p{Pd}]/gu, "");
 export const roundFor = (s: Inventory) => (s.status === "recount" ? 2 : 1);
+export function parseEquipmentBarcode(code: string) {
+  const parts = code.trim().split(";");
+  if (parts.length !== 2 || !parts.every((part) => part.trim())) return null;
+  return { productCode: parts[0].trim(), serial: parts[1].trim() };
+}
 export function lookupBarcode(products: Product[], code: string) {
   const q = code.trim();
   return products.find(

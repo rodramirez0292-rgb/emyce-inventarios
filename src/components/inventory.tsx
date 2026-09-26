@@ -51,6 +51,7 @@ import {
   normalizeSerial,
   findDuplicate,
   lookupBarcode,
+  parseEquipmentBarcode,
   searchProducts,
   differences,
   validateQuantity,
@@ -368,7 +369,7 @@ export function InventoryPage() {
 }
 export function ScanPage() {
   const { id } = useParams();
-  const { data, write } = useStore();
+  const { data, write, user, repo } = useStore();
   const nav = useNavigate();
   const s = data.inventory_sessions.find((v) => v.id === id);
   const [unknown, setUnknown] = useState(""),
@@ -432,8 +433,27 @@ export function ScanPage() {
     <BarcodeScanner
       onClose={() => nav(`/inventory/${s.id}`)}
       onRead={(code) => {
-        const product = lookupBarcode(scopeFor(data, s), code);
-        if (product) nav(`/inventory/${s.id}/product/${product.id}`);
+        const combined = parseEquipmentBarcode(code);
+        const product = lookupBarcode(scopeFor(data, s), combined?.productCode ?? code);
+        if (product) {
+          if (combined && product.serialized) {
+            const key = `emyce:serial-draft:${repo?.demo ? "demo" : "live"}:${user?.id}:${s.id}:${product.id}:${roundFor(s)}`;
+            const previous = readSerialDraft(key);
+            const sameSerial = normalizeSerial(previous.candidate ?? "") === normalizeSerial(combined.serial);
+            if (!saveSerialDraft(key, {
+              candidate: combined.serial,
+              originalCode: code,
+              photo: sameSerial ? previous.photo ?? "" : "",
+              notes: sameSerial ? previous.notes ?? "" : "",
+              condition: sameSerial ? previous.condition ?? "found" : "found",
+            })) {
+              setUnknown(code);
+              toast.error("No se pudo preparar la serie. Busca el producto e introduce la serie manualmente.");
+              return;
+            }
+          }
+          nav(`/inventory/${s.id}/product/${product.id}`);
+        }
         else {
           feedback(true);
           setUnknown(code);
@@ -540,8 +560,19 @@ function CountProductForm({ draftKey }: { draftKey: string }) {
         onClose={() => setScan(false)}
         onRead={(code) => {
           setScan(false);
+          const combined = parseEquipmentBarcode(code);
+          if (code.includes(";") && !combined) {
+            feedback(true);
+            toast.error("Código incompleto: se espera SKU;SERIE. Vuelve a escanearlo.");
+            return;
+          }
+          if (combined && !lookupBarcode([p], combined.productCode)) {
+            feedback(true);
+            toast.error("Este código pertenece a otro producto. Escanea la etiqueta del producto seleccionado.");
+            return;
+          }
           setOriginalCode(code);
-          setCandidate(code);
+          setCandidate(combined?.serial ?? code);
         }}
       />
     );

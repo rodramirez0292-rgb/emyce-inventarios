@@ -1,0 +1,36 @@
+import { test, expect } from "@playwright/test";
+
+test("SKU;SERIE abre confirmación, persiste y bloquea duplicados y otro producto", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("button", { name: /Probar con datos/ }).click();
+  await page.getByRole("link", { name: "Nuevo inventario", exact: true }).click();
+  await page.getByLabel("Nombre del inventario").fill("Código combinado QA");
+  await page.getByText("Almacén", { exact: true }).click();
+  await page.getByRole("button", { name: "Comenzar inventario", exact: true }).click();
+  await page.getByRole("link", { name: "Escanear producto", exact: true }).click();
+  await page.getByLabel("O escribe el código").fill("CHC-110;11100112505270073");
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await expect(page.getByLabel("Número de serie", { exact: true })).toHaveValue("11100112505270073");
+  await page.reload();
+  await expect(page.getByLabel("Número de serie", { exact: true })).toHaveValue("11100112505270073");
+  await page.getByRole("button", { name: "Confirmar serie", exact: true }).click();
+  await expect(page.locator(".serial-list code")).toHaveText("11100112505270073");
+  await page.getByRole("button", { name: "Escanear otra unidad", exact: true }).click();
+  await page.getByLabel("O escribe la serie").fill("CHC-110;11100112505270073");
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await page.getByRole("button", { name: "Confirmar serie", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "SERIE YA REGISTRADA", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Regresar", exact: true }).click();
+  await page.getByRole("button", { name: "Cerrar", exact: true }).click();
+  await page.getByRole("button", { name: "Escanear otra unidad", exact: true }).click();
+  await page.getByLabel("O escribe la serie").fill("VR-12;00123");
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await expect(page.getByText(/Este código pertenece a otro producto/)).toBeVisible();
+  await expect(page.getByLabel("Número de serie", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Escanear otra unidad", exact: true }).click();
+  await page.getByLabel("O escribe la serie").fill("CHC-110;0000123");
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await expect(page.getByLabel("Número de serie", { exact: true })).toHaveValue("0000123");
+  await page.getByRole("button", { name: "Confirmar serie", exact: true }).click();
+  await expect(page.locator(".serial-list code")).toHaveText(["11100112505270073", "0000123"]);
+});
